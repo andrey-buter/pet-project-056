@@ -84,6 +84,7 @@ async function main() {
 
     if (unclickedPosts.length === 0) {
         console.log('Nothing to do.');
+        await sendTelegramMessage('ℹ️ В Buzz52 пока нет новых (непрокликанных) постов. Отдыхаем! 😴');
         return;
     }
 

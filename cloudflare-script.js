@@ -3,6 +3,16 @@ export default {
     if (request.method === "POST") {
       try {
         const payload = await request.json();
+        
+        // --- ФЛАГ ДЕБАГА ---
+        const DEBUG = env.DEBUG === "true";
+
+        // --- Вспомогательная функция для логов ---
+        const debugLog = (...args) => {
+          if (DEBUG) {
+            console.log("[DEBUG]", ...args);
+          }
+        };
 
         // Убедимся, что это текстовое сообщение
         if (payload.message && payload.message.text) {
@@ -11,6 +21,7 @@ export default {
 
           // Проверка: отвечаем только вам
           if (chatId !== env.ALLOWED_CHAT_ID) {
+            debugLog(`Проигнорировано сообщение от чужого чата: ${chatId}`);
             return new Response("OK");
           }
 
@@ -19,60 +30,77 @@ export default {
 
           // Проверяем, это команда или токен?
           if (text === "/run" || text === "/check" || text === "/start") {
-            // Оставляем inputs пустым - GitHub Action возьмет токен из своих секретов
-            replyMessage =
-              "⏳ Отправлена команда на ручной запуск проверки (со старым токеном)...";
+            replyMessage = "⏳ Отправлена команда на ручной запуск проверки (со старым токеном)...";
+            debugLog("Обнаружена команда /run");
           } else {
-            // Считаем, что это новый токен
             inputs = { newToken: text };
-            replyMessage =
-              "✅ Получен новый токен! Запускаю GitHub Actions для обновления секрета и кликов...";
+            replyMessage = "✅ Получен новый токен! Обновляю секрет и запускаю клики...";
+            debugLog("Обнаружен новый токен");
           }
 
-          // Делаем POST запрос к GitHub API (workflow_dispatch)
           const githubRepo = env.GITHUB_REPO;
           const githubToken = env.GITHUB_PAT;
           const workflowId = "cron.yml";
+          const githubBranch = env.GITHUB_BRANCH || "main";
 
-          const githubRes = await fetch(
-            `https://api.github.com/repos/${githubRepo}/actions/workflows/${workflowId}/dispatches`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${githubToken}`,
-                Accept: "application/vnd.github.v3+json",
-                "User-Agent": "Cloudflare-Worker",
-              },
-              body: JSON.stringify({
-                ref: "main", // Ваша ветка
-                inputs: inputs, // Если пустой, токен не обновится, просто пройдет ран
-              }),
+          debugLog(`Делаю запрос к GitHub API... Репо: ${githubRepo}, Ветка: ${githubBranch}`);
+          debugLog(`Inputs:`, JSON.stringify(inputs));
+
+          const githubRes = await fetch(`https://api.github.com/repos/${githubRepo}/actions/workflows/${workflowId}/dispatches`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${githubToken}`,
+              "Accept": "application/vnd.github.v3+json",
+              "User-Agent": "Cloudflare-Worker"
             },
-          );
+            body: JSON.stringify({
+              ref: githubBranch,
+              inputs: inputs 
+            })
+          });
 
-          if (!githubRes.ok) {
-            const errorText = await githubRes.text();
-            replyMessage = `❌ Ошибка вызова GitHub: ${githubRes.status} ${errorText}`;
+          const githubResText = await githubRes.text();
+
+          if (githubRes.ok) {
+            debugLog(`УСПЕХ GitHub: статус ${githubRes.status}`);
+            if (DEBUG) {
+               replyMessage += `\n\n[DEBUG Info]\nGitHub Status: ${githubRes.status} (должно быть 204)\nGitHub Response: ${githubResText || "Пусто (Это норма)"}`;
+            }
+          } else {
+            debugLog(`ОШИБКА GitHub: статус ${githubRes.status}, текст: ${githubResText}`);
+            console.error(`[ERROR] GitHub Response Error: ${githubRes.status} ${githubResText}`);
+            replyMessage = `❌ Ошибка вызова GitHub: HTTP ${githubRes.status}\n\nТекст ошибки: ${githubResText}`;
           }
 
-          // Посылаем ответ в Telegram
-          await fetch(
-            `https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: replyMessage,
-              }),
-            },
-          );
+          debugLog(`Отправляем итоговый ответ в Телеграм:`, replyMessage);
+
+          await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: replyMessage
+            })
+          });
         }
         return new Response("OK");
       } catch (e) {
+        console.error(`[ERROR] КРИТИЧЕСКАЯ ОШИБКА в скрипте Cloudflare: ${e.message}`);
+        
+        try {
+          await fetch(`https://api.telegram.org/bot${env.TG_BOT_TOKEN}/sendMessage`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: env.ALLOWED_CHAT_ID,
+              text: `💥 Скрипт Cloudflare упал с ошибкой:\n${e.message}`
+            })
+          });
+        } catch(e2) {}
+
         return new Response("Error", { status: 500 });
       }
     }
     return new Response("Method not allowed", { status: 405 });
-  },
+  }
 };
