@@ -1,0 +1,41 @@
+name: Auto Clicker Cron
+
+on:
+  schedule:
+    # Запуск каждые 30 минут (можно поменять на '*/45 * * * *' для 45 минут)
+    - cron: '*/30 * * * *'
+  # Запуск по API или из UI (Cloudflare будет дергать этот триггер)
+  workflow_dispatch:
+    inputs:
+      newToken:
+        description: 'New Bearer Token'
+        required: false
+
+jobs:
+  run-clicker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Обновляем секрет в репозитории на будущее, если передан новый токен!
+      - name: Update GitHub Secret with new token
+        if: ${{ github.event.inputs.newToken != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          gh secret set BUZZ52_TOKEN --body "${{ github.event.inputs.newToken }}"
+          echo "Token updated successfully in GitHub Secrets!"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run script
+        env:
+          # При ручном запуске (через тг) берём newToken, иначе старый из секретов
+          BUZZ52_TOKEN: ${{ github.event.inputs.newToken || secrets.BUZZ52_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: node auto-clicker.js
