@@ -73,6 +73,9 @@ async function main() {
   if (!postsResponse.ok) {
     const text = await postsResponse.text();
     console.error(`Received status ${postsResponse.status}: ${text}`);
+    await sendTelegramMessage(
+      `Received status ${postsResponse.status}: ${text}`,
+    );
     return;
   }
 
@@ -119,7 +122,7 @@ async function main() {
       if (clickResponse.ok) {
         console.log(`Successfully clicked post ${post.post_id}`);
         await sendTelegramMessage(
-          `✅ Пост прокликался!\nID: ${post.post_id}\nURL: ${post.post_url}`,
+          `✅ Successfully clicked post!\nID: ${post.post_id}\nURL: ${post.post_url}`,
         );
       } else if (clickResponse.status === 401 || clickResponse.status === 403) {
         console.error("Token expired while clicking!");
@@ -129,6 +132,9 @@ async function main() {
         process.exit(1);
       } else {
         console.error(
+          `Failed to click post ${post.post_id}. Status: ${clickResponse.status}`,
+        );
+        await sendTelegramMessage(
           `Failed to click post ${post.post_id}. Status: ${clickResponse.status}`,
         );
       }
