@@ -58,6 +58,7 @@ async function main() {
     });
   } catch (e) {
     console.error("Error fetching posts:", e);
+    await sendTelegramMessage("Error fetching posts");
     return;
   }
 
@@ -80,6 +81,7 @@ async function main() {
     data = await postsResponse.json();
   } catch (e) {
     console.error("Error parsing JSON:", e);
+    await sendTelegramMessage("Error parsing JSON");
     return;
   }
 
@@ -91,7 +93,7 @@ async function main() {
   if (unclickedPosts.length === 0) {
     console.log("Nothing to do.");
     // Отправляем отчёт "Отдыхаем", только если мы запустили скрипт вручную (или через Телегу)
-    if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+    if (process.env.GITHUB_EVENT_NAME === "workflow_dispatch") {
       await sendTelegramMessage(
         "ℹ️ В Buzz52 пока нет новых (непрокликанных) постов. Отдыхаем! 😴",
       );
@@ -132,6 +134,9 @@ async function main() {
       }
     } catch (e) {
       console.error(`Error requesting click for post ${post.post_id}:`, e);
+      await sendTelegramMessage(
+        `Error requesting click for post ${post.post_id}:`,
+      );
     }
 
     // Небольшая задержка, чтобы не спамить API одновременно и не получить бан (Rate Limit)
