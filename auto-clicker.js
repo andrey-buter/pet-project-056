@@ -120,9 +120,16 @@ async function main() {
       );
 
       if (clickResponse.ok) {
-        console.log(`Successfully clicked post ${post.post_id}`);
+        let responseText = "";
+        try {
+          responseText = await clickResponse.text();
+        } catch (e) {
+          responseText = "Could not parse response";
+        }
+        
+        console.log(`Successfully clicked post ${post.post_id}. Response: ${responseText}`);
         await sendTelegramMessage(
-          `✅ Successfully clicked post!\nID: ${post.post_id}\nURL: ${post.post_url}`,
+          `✅ Successfully clicked post!\nID: ${post.post_id}\nURL: ${post.post_url}\nService Response: ${responseText || "Empty (OK)"}`,
         );
       } else if (clickResponse.status === 401 || clickResponse.status === 403) {
         console.error("Token expired while clicking!");
