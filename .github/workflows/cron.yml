@@ -1,15 +1,19 @@
 name: Auto Clicker Cron
 
 on:
-  schedule:
-    # Запуск в "неровные" минуты (17-я и 47-я), чтобы обойти пробки на серверах GitHub Actions
-    - cron: "17,47 * * * *"
+#  schedule:
+#    # Запуск в "неровные" минуты (17-я и 47-я), чтобы обойти пробки на серверах GitHub Actions
+#    - cron: "17,47 * * * *"
   # Запуск по API или из UI (Cloudflare будет дергать этот триггер)
   workflow_dispatch:
     inputs:
       newToken:
         description: "New Bearer Token"
         required: false
+      isCron:
+        description: "Is this run triggered by cron?"
+        required: false
+        default: "false"
 
 jobs:
   run-clicker:
@@ -38,4 +42,5 @@ jobs:
           BUZZ52_TOKEN: ${{ github.event.inputs.newToken || secrets.BUZZ52_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          IS_CRON: ${{ github.event.inputs.isCron || 'false' }}
         run: node auto-clicker.js

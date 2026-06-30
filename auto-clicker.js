@@ -96,7 +96,7 @@ async function main() {
   if (unclickedPosts.length === 0) {
     console.log("Nothing to do.");
     // Отправляем отчёт "Отдыхаем", только если мы запустили скрипт вручную (или через Телегу)
-    if (process.env.GITHUB_EVENT_NAME === "workflow_dispatch") {
+    if (process.env.GITHUB_EVENT_NAME === "workflow_dispatch" && process.env.IS_CRON !== "true") {
       await sendTelegramMessage(
         "ℹ️ В Buzz52 пока нет новых (непрокликанных) постов. Отдыхаем! 😴",
       );
